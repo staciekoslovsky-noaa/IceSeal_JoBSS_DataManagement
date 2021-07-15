@@ -47,9 +47,13 @@ image_dir$camera_dir <- paste(image_dir$path, image_dir$camera_loc, sep = "/")
 rm(i, temp, wd)
 
 # Process images and meta.json files
-images2DB <- data.frame(image_name = as.character(""), dt = as.character(""), image_type = as.character(""), stringsAsFactors = FALSE)
+images2DB <- data.frame(image_name = as.character(""), dt = as.character(""), image_type = as.character(""), 
+                        image_dir = as.character(""), stringsAsFactors = FALSE)
 images2DB <- images2DB[which(images2DB == "test"), ]
+
 meta2DB <- data.frame(rjson::fromJSON(paste(readLines(metaTemplate), collapse="")))
+names(meta2DB)[names(meta2DB) == "effort"] <- "effort_field"
+meta2DB$effort_reconciled <- ""
 meta2DB$meta_file <- ""
 meta2DB$dt <- ""
 meta2DB$flight <- ""
@@ -64,10 +68,11 @@ for (i in 1:nrow(image_dir)){
   files$dt <- str_extract(files$image_name, "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]")
   files$image_type <- ifelse(grepl("rgb", files$image_name) == TRUE, "rgb_image", 
                              ifelse(grepl("ir", files$image_name) == TRUE, "ir_image",
-                                    ifelse(grepl("uv", files$image_name) == TRUE, "uv_mage", 
+                                    ifelse(grepl("uv", files$image_name) == TRUE, "uv_image", 
                                            ifelse(grepl("meta", files$image_name) == TRUE, "meta.json", "Unknown"))))
+  files$image_dir <- image_dir$camera_dir[i]
   
-  images <- files[which(grepl("Image", files$image_type)), ]
+  images <- files[which(grepl("image", files$image_type)), ]
   images2DB <- rbind(images2DB, images)
   
   meta <- files[which(files$image_type == "meta.json"), ]
@@ -75,6 +80,8 @@ for (i in 1:nrow(image_dir)){
     for (j in 1:nrow(meta)){
       meta_file <- paste(image_dir$camera_dir[i], meta$image_name[j], sep = "/")
       metaJ <- data.frame(rjson::fromJSON(paste(readLines(meta_file), collapse="")), stringsAsFactors = FALSE)
+      names(metaJ)[names(metaJ) == "effort"] <- "effort_field"
+      metaJ$effort_reconciled <- NA
       metaJ$meta_file <- basename(meta_file)
       metaJ$dt <- str_extract(metaJ$meta_file, "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]")
       metaJ$flight <- str_extract(metaJ$meta_file, "fl[0-9][0-9]")
@@ -89,6 +96,9 @@ colnames(meta2DB) <- gsub("\\.", "_", colnames(meta2DB))
 
 images2DB$flight <- str_extract(images2DB$image_name, "fl[0-9][0-9]")
 images2DB$camera_view <- gsub("_", "", str_extract(images2DB$image_name, "_[A-Z]_"))
+images2DB$ir_nuc <- NA
+images2DB$rgb_manualreview <- NA
+images2DB$detection_image_list <- NA
 
 # Process effort logs
 # logs2DB <- data.frame(effort_log = as.character(""), gps_time = as.character(""), sys_time = as.character(""), note = as.character(""), stringsAsFactors = FALSE)
