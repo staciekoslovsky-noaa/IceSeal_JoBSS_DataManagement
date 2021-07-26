@@ -2,10 +2,10 @@
 # S. Hardy, 10 August 2020
 
 # Variables
-image_list <- "C:/Users/stacie.hardy/Work/Work/Projects/AS__InFlight_KAMERA/Data/NUCedIR/NUCimages_jobss2021_20210726_YBprocessed.txt"
+image_list <- "C:/Users/stacie.hardy/Work/Work/Projects/AS__InFlight_KAMERA/Data/NUCedIR/NUCimages_jobss2021_20210726_BXHprocessed.csv"
 update_schema <- "surv_jobss"
 update_table <- "tbl_images"
-update_field <- "ir_nuc_yb"
+update_field <- "ir_nuc_bxh"
  
 # Install libraries
 library(tidyverse)
