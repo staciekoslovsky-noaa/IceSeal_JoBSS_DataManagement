@@ -98,7 +98,6 @@ images2DB$flight <- str_extract(images2DB$image_name, "fl[0-9][0-9]")
 images2DB$camera_view <- gsub("_", "", str_extract(images2DB$image_name, "_[A-Z]_"))
 images2DB$ir_nuc <- NA
 images2DB$rgb_manualreview <- NA
-images2DB$detection_image_list <- NA
 
 # Process effort logs
 # logs2DB <- data.frame(effort_log = as.character(""), gps_time = as.character(""), sys_time = as.character(""), note = as.character(""), stringsAsFactors = FALSE)
