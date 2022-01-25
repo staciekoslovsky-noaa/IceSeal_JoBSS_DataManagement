@@ -1,0 +1,9 @@
+select image_dir || '/' || image_name
+from surv_jobss.tbl_images
+where ((ir_nuc_bxh = 'Y' and ir_nuc_yb = 'N') or (ir_nuc_bxh = 'N' and ir_nuc_yb = 'Y')) and image_type = 'ir_image'
+union
+select * 
+from (select image_dir || '/' || image_name
+	from surv_jobss.tbl_images
+	where ir_nuc_bxh = 'Y' and ir_nuc_yb = 'Y' and image_type = 'ir_image'
+	order by random() limit 1128) a
