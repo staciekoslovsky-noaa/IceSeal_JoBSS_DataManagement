@@ -19,7 +19,7 @@ con <- RPostgreSQL::dbConnect(PostgreSQL(),
                               rstudioapi::askForPassword(paste("Enter your DB password for user account: ", Sys.getenv("pep_admin"), sep = "")))
 
 # Import data and process
-nonnuc <- read.csv(nonnuc_list, skip = 2, header = FALSE, stringsAsFactors = FALSE, col.names = c("detection", "image_name", "frame_number", "bound_left", "bound_bottom", "bound_right", "bound_top", "score", "length", "detection_type", "type_score", "detection_comments"))
+nonnuc <- read.csv(nonnuc_list, skip = 2, header = FALSE, stringsAsFactors = FALSE, col.names = c("detection", "image_name", "frame_number", "bound_left", "bound_top", "bound_right", "bound_bottom", "score", "length", "detection_type", "type_score", "detection_comments"))
 nonnuc <- nonnuc %>%
   mutate(image_name = sapply(strsplit(image_name, split= "\\/"), function(x) x[length(x)])) %>%
   select(image_name)
