@@ -1,0 +1,2 @@
+UPDATE surv_jobss.tbl_images i
+SET ir_nuc = ir_nuc_svm;

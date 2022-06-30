@@ -1,0 +1,20 @@
+UPDATE surv_jobss.geo_images_meta m
+SET effort_reconciled = effort_field;
+
+UPDATE surv_jobss.geo_images_meta m
+SET effort_reconciled = 'ON'
+FROM surv_jobss.tbl_images i
+WHERE m.flight = i.flight AND m.camera_view = i.camera_view AND m.dt = i.dt
+AND m.flight = 'fl01' AND m.dt >= '20210417_231715.548243' AND m.dt <= '20210417_231731.165106';
+
+UPDATE surv_jobss.geo_images_meta m
+SET effort_reconciled = 'BEAR'
+FROM surv_jobss.tbl_images i
+WHERE m.flight = i.flight AND m.camera_view = i.camera_view AND m.dt = i.dt
+AND m.flight = 'fl16' AND m.dt >= '20210522_010628.935774' AND m.dt <= '20210522_011015.713240';
+
+UPDATE surv_jobss.geo_images_meta m
+SET effort_reconciled = 'OFF'
+FROM surv_jobss.tbl_images i
+WHERE m.flight = i.flight AND m.camera_view = i.camera_view AND m.dt = i.dt
+AND i.ir_nuc = 'Y';
