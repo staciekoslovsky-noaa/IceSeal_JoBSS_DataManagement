@@ -1,0 +1,113 @@
+---
+title: 'JoBSS: INS Roll Evaluation'
+author: "Stacie Hardy"
+date: "7/5/2022"
+output: pdf_document
+
+knit: (function(inputFile, encoding) { 
+  rmarkdown::render(
+    inputFile, 
+    encoding = encoding, 
+    output_file = file.path(dirname(inputFile), 'DataSummary_JoBSS_RollAndFootprintArea_20220705.pdf')) 
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE) 
+
+library(tidyverse)
+library(stringr)
+library(lubridate)
+library(RPostgreSQL)
+library(sf)
+library(ggbreak)
+
+# Connect to DB and get starting data
+con <- RPostgreSQL::dbConnect(PostgreSQL(), 
+                              dbname = Sys.getenv("pep_db"), 
+                              host = Sys.getenv("pep_ip"), 
+                              port = Sys.getenv("pep_port"),
+                              user = Sys.getenv("pep_user"), 
+                              password = Sys.getenv("user_pw"))
+
+# Get data from DB
+#roll <- RPostgreSQL::dbGetQuery(con, "SELECT flight, camera_view, dt, ins_roll FROM surv_jobss.geo_images_meta")
+footprints <- sf::st_read(con, query = "SELECT * FROM surv_jobss.geo_images_footprint", geometry_column = "geom") 
+
+footprints <- footprints %>% 
+  mutate(area = st_area(footprints)) %>%
+  arrange(flight, camera_view, dt) %>%
+  filter(image_type == "rgb_image" & altitude >= 243.84 & altitude <= 365.76 & effort == "ON")
+
+```
+
+## Introduction
+The purpose of this document is to present roll values and the area of associated image footprints. Data have been filtered to represent images taken between 800 and 1200 ft and when the system was ON effort. This ON effort distinction is made based on the field assigned effort, not the reconciled effort that will ultimately be used for distinguishing effort in the final analysis.
+
+## Count of Roll Values Across All Flights
+The following figure depicts the number of color image sets taken at particular roll bins. An "image set" is defined as a single timestamp; assuming no issues in the data collection (e.g. dropped frames) a single count would represent three color images (one for each color camera view). The roll values were separated into 30 bins for representation in this figure.
+
+```{r roll_by_count, echo = FALSE, fig.height=4}
+ggplot(data = footprints %>% filter(camera_view == "C")) +
+  geom_histogram(aes(x = roll), bins = 30) + 
+  ggbreak::scale_y_break(c(15000, 245000)) +
+  ggtitle("Count of Color Image Sets based on Roll") +
+  xlab("Roll (degrees)") +
+  ylab("Count of Color Image Sets (combined C/L/R)")
+  
+```
+
+\newpage
+## Count of Image Footprint Area by Camera View
+The following three figures depict the number of color images with . The footprint area values were separated into 30 bins for representation in these figures.
+
+```{r area_by_quantile_C, echo = FALSE, fig.height=4}
+ggplot(data = footprints %>% filter(camera_view == "C")) +
+  geom_histogram(aes(x =  as.numeric(area)), bins = 30) + 
+  scale_x_continuous(limits = c(0, 25000)) + 
+  ggtitle("Count of Center Color Images based on Footprint Area") +
+  xlab("Footprint Area (m^2)") +
+  ylab("Count of Center Images")
+```
+
+```{r area_by_quantile_L, echo = FALSE, fig.height=4}
+ggplot(data = footprints %>% filter(camera_view == "L")) +
+  geom_histogram(aes(x =  as.numeric(area)), bins = 30) + 
+  scale_x_continuous(limits = c(0, 25000)) + 
+  ggtitle("Count of Left Color Images based on Footprint Area") +
+  xlab("Footprint Area (m^2)") +
+  ylab("Count of Left Color Images")
+```
+
+```{r area_by_quantile_R, echo = FALSE, fig.height=4}
+ggplot(data = footprints %>% filter(camera_view == "R")) +
+  geom_histogram(aes(x =  as.numeric(area)), bins = 30) + 
+  scale_x_continuous(limits = c(0, 25000)) + 
+    ggtitle("Count of Right Color Images based on Footprint Area") +
+  xlab("Footprint Area (m^2)") +
+  ylab("Count of Right Color Images")
+```
+
+\newpage
+## Image Footprint Area based on Aircraft Roll Values
+The following figures depict the image footprint area based on the aircraft roll values. There is one figure per flight, and within each figure, there are three panels, one for each camera view. The left and right camera views have a larger baseline footprint (when roll = 0) than the center view because of the angle in the cameras. The data are time-synced across the different panels, so any changes in roll (and in turn footprint area) at a particular timestamp are reflected across all three panels at the same location along the line.
+
+```{r area_by_roll, echo = FALSE, fig.height=4}
+flights <- unique(footprints$flight)
+
+min_roll <- min(footprints$roll)
+max_roll <- max(footprints$roll)
+
+for (i in 1:length(flights)) {
+  p <- ggplot(data = footprints %>% filter(flight == flights[i]), aes(x = dt, y = as.numeric(area), color = roll, group = 1)) +
+  geom_line() +
+  scale_color_gradientn(colours = rainbow(5), limits = c(min_roll, max_roll)) + 
+  facet_wrap(vars(camera_view), nrow = 3) +
+  theme(axis.text.x=element_blank()) +
+  ggtitle(paste("Flight ", flights[i], sep = "")) +
+  xlab("Flight Duration") +
+  ylab("Footprint Area (m^2)")
+  
+  print(p)
+}
+```
