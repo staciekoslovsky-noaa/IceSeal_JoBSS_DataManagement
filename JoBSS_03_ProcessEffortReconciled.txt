@@ -18,3 +18,9 @@ SET effort_reconciled = 'OFF'
 FROM surv_jobss.tbl_images i
 WHERE m.flight = i.flight AND m.camera_view = i.camera_view AND m.dt = i.dt
 AND i.ir_nuc = 'Y';
+
+UPDATE surv_jobss.geo_images_meta
+SET effort_reconciled = 'OFF'
+WHERE (ins_roll > 5 AND camera_view = 'L')
+OR (ins_roll < -5 AND camera_view = 'R')
+OR (abs(ins_roll) > 30  AND camera_view = 'C')
