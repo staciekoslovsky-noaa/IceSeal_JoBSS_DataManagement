@@ -1,0 +1,7 @@
+SELECT r.detection, i.image_name as ir_image, r.image_name as color_image, i.detection_type as thermal_type, r.detection_type as color_type, r.bound_bottom, r.bound_top
+FROM surv_jobss.tbl_detections_processed_rgb r
+LEFT JOIN surv_jobss.tbl_detections_processed_ir i USING (detection_id)
+WHERE ((i.detection_type = 'animal_duplicate')
+OR (r.bound_bottom < 600 OR r.bound_top > 3500))
+AND r.detection_type LIKE '%seal' OR r.detection_type = 'polar_bear'
+ORDER BY i.image_name
