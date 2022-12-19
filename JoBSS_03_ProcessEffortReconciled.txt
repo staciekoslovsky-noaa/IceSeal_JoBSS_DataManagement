@@ -1,6 +1,7 @@
 UPDATE surv_jobss.geo_images_meta m
 SET effort_reconciled = effort_field;
 
+--Correct errors in effort assignment
 UPDATE surv_jobss.geo_images_meta m
 SET effort_reconciled = 'ON'
 FROM surv_jobss.tbl_images i
@@ -19,8 +20,67 @@ FROM surv_jobss.tbl_images i
 WHERE m.flight = i.flight AND m.camera_view = i.camera_view AND m.dt = i.dt
 AND i.ir_nuc = 'Y';
 
+--Assign effort based on roll values
 UPDATE surv_jobss.geo_images_meta
 SET effort_reconciled = 'OFF'
 WHERE (ins_roll > 5 AND camera_view = 'L')
 OR (ins_roll < -5 AND camera_view = 'R')
 OR (abs(ins_roll) > 30  AND camera_view = 'C')
+
+--Update error when the aircraft was over land
+UPDATE surv_jobss.geo_images_meta m
+SET effort_reconciled = 'OFF'
+FROM surv_jobss.tbl_images i
+WHERE m.flight = i.flight AND m.camera_view = i.camera_view AND m.dt = i.dt
+--fl02
+AND ((m.flight = 'fl02' AND m.dt >= '20210421_213739.778454' AND m.dt <= '20210421_213745.758130')
+OR (m.flight = 'fl02' AND m.dt >= '20210422_004919.701486' AND m.dt <= '20210422_004931.806687')
+--fl04
+OR (m.flight = 'fl04' AND m.dt = '20210424_005429.559631')
+OR (m.flight = 'fl04' AND m.dt >= '20210424_005608.707972' AND m.dt <= '20210424_005617.442031')
+--fl05
+OR (m.flight = 'fl05' AND m.dt >= '20210424_225136.808952' AND m.dt <= '20210424_225137.935233')
+OR (m.flight = 'fl05' AND m.dt = '20210425_010303.637688')
+--fl06
+OR (m.flight = 'fl06' AND m.dt >= '20210427_005026.614008' AND m.dt <= '20210427_005030.437831')
+OR (m.flight = 'fl06' AND m.dt = '20210426_210053.000486')
+--fl08
+OR (m.flight = 'fl08' AND m.dt >= '20210503_001217.266409' AND m.dt <= '20210503_001221.621563')
+OR (m.flight = 'fl08' AND m.dt >= '20210502_222656.320106' AND m.dt <= '20210502_223350.038083')
+--fl09
+OR (m.flight = 'fl09' AND m.dt >= '20210505_020244.430533' AND m.dt <= '20210505_020251.526257')
+--fl10
+OR (m.flight = 'fl10' AND m.dt >= '20210506_022720.775023' AND m.dt <= '20210506_022722.481478')
+--fl12
+OR (m.flight = 'fl12' AND m.dt >= '20210514_003251.241402' AND m.dt <= '20210514_003253.536700')
+--fl13
+OR (m.flight = 'fl13' AND m.dt >= '20210517_204653.453510' AND m.dt <= '20210517_204715.759988')
+--fl14
+OR (m.flight = 'fl14' AND m.dt >= '20210518_223549.503312' AND m.dt <= '20210518_223557.723745')
+--fl16
+OR (m.flight = 'fl16' AND m.dt >= '20210521_223933.751969' AND m.dt <= '20210521_223942.741028')
+OR (m.flight = 'fl16' AND m.dt >= '20210522_022539.531955' AND m.dt <= '20210522_022540.402925')
+OR (m.flight = 'fl16' AND m.dt >= '20210522_022709.745094' AND m.dt <= '20210522_022718.587457')
+--fl17
+OR (m.flight = 'fl17' AND m.dt >= '20210524_001814.747843' AND m.dt <= '20210524_001826.055132')
+--fl18
+OR (m.flight = 'fl18' AND m.dt >= '20210524_234153.704331' AND m.dt <= '20210524_234201.308629')
+OR (m.flight = 'fl18' AND m.dt >= '20210524_234107.079542' AND m.dt <= '20210524_234108.978535')
+--fl19
+OR (m.flight = 'fl19' AND m.dt = '20210525_202939.825947')
+--fl21
+OR (m.flight = 'fl21' AND m.dt >= '20210529_002011.336707' AND m.dt <= '20210529_002014.507392')
+--fl23
+OR (m.flight = 'fl23' AND m.dt = '20210530_225953.312114')
+--fl24
+OR (m.flight = 'fl24' AND m.dt >= '20210601_002409.811024' AND m.dt <= '20210601_002415.487554')
+OR (m.flight = 'fl24' AND m.dt >= '20210601_002231.624985' AND m.dt <= '20210601_002232.402337')
+OR (m.flight = 'fl24' AND m.dt >= '20210531_203051.045668' AND m.dt <= '20210531_203118.696243')
+--fl25
+OR (m.flight = 'fl25' AND m.dt >= '20210602_002917.843423' AND m.dt <= '20210602_002935.354649')
+--fl28
+OR (m.flight = 'fl28' AND m.dt >= '20210607_203104.068759' AND m.dt <= '20210607_203106.258202')
+OR (m.flight = 'fl28' AND m.dt >= '20210608_011027.893858' AND m.dt <= '20210608_011044.133630')
+--fl29
+OR (m.flight = 'fl29' AND m.dt >= '20210611_233334.989157' AND m.dt <= '20210611_233337.315002')
+);
