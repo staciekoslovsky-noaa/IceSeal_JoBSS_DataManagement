@@ -1,0 +1,158 @@
+---
+title: "JoBSS Bounding Box Matching"
+author: "Stacie Hardy"
+date: "Date Created: `r format(Sys.time(), '%m/%d/%Y')`"
+output: pdf_document
+
+knit: (function(inputFile, encoding) { 
+  rmarkdown::render(
+    inputFile, 
+    encoding = encoding, 
+    output_file = file.path(dirname(inputFile), 'JoBSS_BoundingBoxMatching_20221128.pdf'))
+  })
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warnings = FALSE)
+
+# Create functions -----------------------------------------------
+# Function to install packages needed
+install_pkg <- function(x)
+  {
+  if (!require(x,character.only = TRUE))
+    {
+    install.packages(x,dep=TRUE)
+    if(!require(x,character.only = TRUE)) stop("Package not found")
+    }
+  }
+
+merge_and_intersect <- function(matchWhat, toWhat, method) {
+  matchWhat_var <- deparse(substitute(matchWhat))
+  toWhat_var <- deparse(substitute(toWhat))
+  
+  data <- matchWhat %>%
+    full_join (toWhat, by = setNames(paste0(toWhat_var, "_image_name"), paste0(matchWhat_var, "_image_name"))) %>%
+    mutate(image_name = ifelse(
+      is.na(!!as.name(paste0(matchWhat_var, "_image_name"))), 
+      !!as.name(paste0(toWhat_var, "_image_name")), 
+      !!as.name(paste0(matchWhat_var, "_image_name")))) %>%
+    mutate(intersect_LR = ifelse(!!as.name(paste0(matchWhat_var, "_bound_right")) < !!as.name(paste0(toWhat_var, "_bound_left")) |
+                                   !!as.name(paste0(matchWhat_var, "_bound_left")) > !!as.name(paste0(toWhat_var, "_bound_right")), "no", "yes"),
+           intersect_TB = ifelse(!!as.name(paste0(matchWhat_var, "_bound_top")) > !!as.name(paste0(toWhat_var, "_bound_bottom")) |
+                                   !!as.name(paste0(matchWhat_var, "_bound_bottom")) < !!as.name(paste0(toWhat_var, "_bound_top")), "no", "yes"))
+
+  if(method == "minimum_distance") {
+    intersecting <- data %>%
+      filter(intersect_LR == "yes" & intersect_TB == "yes") %>%
+      mutate(distance = sqrt(
+        ((!!as.name(paste0(matchWhat_var, "_average_x")) - !!as.name(paste0(toWhat_var, "_average_x"))) ^ 2) + 
+          ((!!as.name(paste0(matchWhat_var, "_average_y")) - !!as.name(paste0(toWhat_var, "_average_y"))) ^ 2)) ) %>%
+      group_by(image_name, !!as.name(paste0(matchWhat_var, "_id"))) %>%
+      slice(which.min(distance)) %>%
+      # filter(distance < 50) %>%
+      select(image_name, paste0(matchWhat_var, "_id"), paste0(toWhat_var, "_id"), distance) %>%
+      ungroup()
+  } else if (method == "maximum_score") {
+    intersecting <- data %>%
+      filter(intersect_LR == "yes" & intersect_TB == "yes") %>%
+      group_by(image_name, !!as.name(paste0(matchWhat_var, "_id"))) %>%
+      slice(which.max(!!as.name(paste0(toWhat_var, "_score")))) %>%
+      select(image_name, paste0(matchWhat_var, "_id"), paste0(toWhat_var, "_id"), paste0(toWhat_var, "_score")) %>%
+      ungroup()
+  }
+}
+
+# Install libraries ----------------------------------------------
+install_pkg("tidyverse")
+install_pkg("RPostgreSQL")
+install_pkg("RColorBrewer")
+install_pkg("ggbreak")
+
+# Get unprocessed RGB images
+con <- RPostgreSQL::dbConnect(PostgreSQL(), 
+                              dbname = Sys.getenv("pep_db"), 
+                              host = Sys.getenv("pep_ip"), 
+                              user = Sys.getenv("pep_admin"), 
+                              password = Sys.getenv("admin_pw"))
+
+original <- RPostgreSQL::dbGetQuery(con, "SELECT * FROM surv_jobss.tbl_detections_original_rgb") %>%
+  data.frame(stringsAsFactors = FALSE) %>%
+  mutate(image_name = basename(image_name)) %>%
+  select(id, detection, image_name, bound_left, bound_top, bound_right, bound_bottom, detection_type, score) %>%
+  mutate(average_x = (bound_left + bound_right)/2,
+         average_y = (bound_top + bound_bottom)/2) %>%
+  mutate(detection_type = ifelse(detection_type == "Ringed Seal", "ringed_seal",
+                                 ifelse(detection_type == "Bearded Seal", "bearded_seal", "polar_bear"))) %>%
+  rename_with( ~ paste0("original_", .x))
+
+processed <- RPostgreSQL::dbGetQuery(con, "SELECT * FROM surv_jobss.tbl_detections_processed_rgb") %>%
+  data.frame(stringsAsFactors = FALSE) %>%
+  mutate(image_name = basename(image_name)) %>%
+  filter(detection_type == "ringed_seal" | detection_type == "bearded_seal" | detection_type == "unknown_seal" | detection_type == "polar_bear") %>%
+  select(id, detection, image_name, bound_left, bound_top, bound_right, bound_bottom, detection_type) %>%
+  mutate(average_x = (bound_left + bound_right)/2,
+         average_y = (bound_top + bound_bottom)/2) %>%
+  rename_with( ~ paste0("processed_", .x))
+
+# Merge data sets together
+merged_distance <- merge_and_intersect(processed, original, "minimum_distance") %>%
+  rename(processed_id_distance = processed_id,
+         original_id_distance = original_id) %>%
+  select(-image_name)
+merged_score <- merge_and_intersect(processed, original, "maximum_score") %>%
+  rename(processed_id_score = processed_id,
+         original_id_score = original_id) %>%
+  select(-image_name)
+
+# Create final summary dataset
+combined <- processed %>% 
+  select(processed_image_name, processed_id, processed_detection_type) %>%
+  left_join(merged_distance, by = c("processed_id" = "processed_id_distance")) %>%
+  left_join(merged_score, by = c("processed_id" = "processed_id_score")) %>%
+  rename(image_name = processed_image_name)
+
+rm(merged_distance, merged_score)
+
+RPostgreSQL::dbWriteTable(con, c("surv_jobss", "tbl_detections_original2processed_rgb"), combined, overwrite = TRUE, row.names = FALSE)
+
+RPostgreSQL::dbDisconnect(con)
+rm(con)
+```
+
+## Introduction
+
+The output from running the IR-RGB trigger model for detecting ice seals and polar bears (that was run on the JoBSS imagery) is two-fold:
+
+- One file containing all the detections in the IR images. Each detection was assigned a unique identifier. (will be referred to as the **'processed IR detections'** moving forward)
+- One file containing all the detections in the RGB images that were found by searching in corresponding regions in the RGB images where "animals" were detected in the IR images. Each detection was assigned a unique identifier that was _different_ than the unique identifiers that were assigned to the detections in the IR frames. (will be referred to as the **'original RGB detections'** moving forward)
+
+In order to compare the final, processed data set of animals (and more specifically for this evaluation, ice seals and polar bears that originated from the IR model and were reviewed for species ID) to the output from the trigger RGB model, we had to develop an approach for matching detections originating from the IR images ('processed IR detections') to the detections originating from the RGB images ('original RGB detections'). The purpose of this document is to provide more information regarding the process for doing such and to provide an overview of how well this worked and some important caveats for using these data moving forward.
+
+## Methods
+
+To link these two data sets together, I did the following:
+
+-   For each originating data set, I calculated the mid-point of each bounding box for each detection. For the 'processed IR detections', I subset the data to only ice seals and polar bears. For the 'original RGB detections', I used the complete output, since these data were not reviewed for species ID. 
+-   I merged data sets together based on image name, which resulted in detections within each frame from the 'processed IR detections' being matched to all detections within the same frame for the 'original RGB detections'. 
+- To find the matching detections, I applied a two-step, using two different methods to assign matches. After this process was complete, what remained were two different sets of matches using the two different approaches.
+    -   First, I looked for matched records where the bounding boxes overlapped; if they did not overlap, that possible match was eliminated from further consideration.
+    -   Second, I matched the 'processed IR detections' to the "best" 'original RGB detections' using two different criteria:
+        - The first method was to select the closest bounding box as the "best match". To do this, I calculated the distances between the overlapping matches and selected the pairing of bounding boxes with the shortest distance between midpoints for each 'processed IR detection'. 
+        - The second method was to select the highest score from the 'original RGB detections' at the "best" match for each 'processed IR detection'.
+-   I merged the results from the two processes together and imported the data into the database into the following table: surv_jobss.tbl_detections_original2processed_rgb.
+
+## Matching Summary
+
+Of the `r nrow(combined)` ice seals and polar bears in the 'processed IR detection' data, `r nrow(combined %>% filter(!is.na(original_id_distance)))` of these records were matched to bounding boxes in the 'original RGB detection' data set. This means that `r nrow(combined) - nrow(combined %>% filter(!is.na(original_id_distance)))` ice seals and polar bears were _not_ matched to bounding boxes in the 'original RGB detection' data set; this could be due to a number of reasons, including being missed by the RGB model or because the bounding boxes from the two methods do not overlap.
+
+- Using the bounding box midpoint distance as the metric for matching bounding boxes, 'processed IR detections' were matched to `r length(unique(combined$original_id_distance))` unique 'original RGB detections', meaning there were `r nrow(combined %>% filter(!is.na(original_id_distance))) - length(unique(combined$original_id_distance))` cases where more than one 'processed IR detection' was matched to the same 'original RGB detection'.
+- Using the highest 'original RGB detection' score as the metric for matching bounding boxes, 'processed IR detections' were matched to `r length(unique(combined$original_id_score))` unique 'original RGB detections', meaning there were `r nrow(combined %>% filter(!is.na(original_id_score))) - length(unique(combined$original_id_score))` cases where more than one 'processed IR detection' was matched to the same 'original RGB detection'.
+- For `r round(nrow(combined %>% filter(original_id_distance == original_id_score)) * 100 / nrow(combined %>% filter(!is.na(original_id_distance))), 1)`% of 'processed IR detections', it was matched to the same 'original RGB detection' using both matching methods. A total of `r nrow(combined %>% filter(original_id_distance != original_id_score))` records matched to different 'original RGB detections' using the two matching methods.
+
+## Recommended Next Steps
+
+- In the database, evaluate how to handle these duplicate assignments. 
+- Evaluate the cases where the two matching methods differed in their 'original RGB detection' assignments.
+- If adjustments need to be made to these duplicate assignments, these changes should be completed via code to document these changes and have them easily repeatable if/when updated detection files are replaced within the DB.
+
+Thank you for reading! :)
