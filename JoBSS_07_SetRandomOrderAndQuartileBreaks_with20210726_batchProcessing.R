@@ -27,7 +27,7 @@ ir_summary$random_order <- 1:nrow(ir_summary)
 for (i in 1:nrow(ir_summary)){
   RPostgreSQL::dbSendQuery(con, paste("UPDATE annotations.tbl_detector_meta ",
                                       "SET random_order = ", ir_summary$random_order[i],
-                                      " WHERE flight = \'", ir_summary$flight[i],
+                                      " WHERE project_schema = \'surv_jobss\' AND flight = \'", ir_summary$flight[i],
                                       "\' AND camera_view = \'", ir_summary$camera_view[i], "\'", sep = ""))
 }
 
