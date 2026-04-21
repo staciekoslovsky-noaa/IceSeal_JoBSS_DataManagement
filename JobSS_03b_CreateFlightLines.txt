@@ -3,7 +3,7 @@ DROP TABLE surv_jobss.geo_track_by_flight;
 CREATE TABLE surv_jobss.geo_track_by_flight AS 
 SELECT row_number() OVER (ORDER BY locs.flight) AS id, locs.flight, st_makeline(locs.geom) AS geom
 FROM (SELECT flight, camera_view, geom
-	ROM surv_jobss.geo_images_meta
+	FROM surv_jobss.geo_images_meta
 	ORDER BY flight, dt) locs
 GROUP BY flight
 ORDER BY flight;
